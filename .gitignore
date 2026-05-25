@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+auth.db
+.DS_Store
+.claude/
+*.pptx
+*.pdf
+~$*
+node_modules/

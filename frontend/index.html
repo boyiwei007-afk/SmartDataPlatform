@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartAnalysis by WBY</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#0052CC',
+            'brand-hover': '#0043A8',
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen flex flex-col" style="background:#F8FAFC; color:#1E293B;">
+
+  <!-- ================================================================= -->
+  <!-- Top Navigation Bar + Tab Bar                                        -->
+  <!-- ================================================================= -->
+  <header id="mainHeader" class="sticky top-0 z-50">
+    <nav class="nav-three-col">
+      <div class="nav-left">
+        <div class="nav-logo-icon">
+          <svg class="nav-logo-svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 10l2-4h14l2 4M4 10v7a2 2 0 002 2h12a2 2 0 002-2v-7M12 15v-3m0 0l-2 2m2-2l2 2" />
+          </svg>
+        </div>
+        <h1 class="nav-title">SmartAnalysis by WBY</h1>
+      </div>
+
+      <nav class="nav-center" id="tabBar">
+        <button class="tab-btn active" data-tab="import">数据接入</button>
+        <button class="tab-btn" data-tab="understanding">数据理解</button>
+        <button class="tab-btn" data-tab="analysis">智能分析</button>
+        <button class="tab-btn" data-tab="training" id="tabBtnTraining">模型训练</button>
+        <button class="tab-btn" data-tab="sandbox" id="tabBtnSandbox">预测沙盘</button>
+        <button class="tab-btn hidden" data-tab="admin" id="tabBtnAdmin">用户管理</button>
+      </nav>
+
+      <div class="nav-right"></div>
+    </nav>
+  </header>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Privacy Notice Modal -->
+  <div id="privacyOverlay" class="modal-overlay hidden">
+    <div class="modal-card card" style="width:26rem; max-width:90vw; text-align:center;">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style="background:rgba(0,82,204,0.08);">
+        <svg class="w-6 h-6" style="color:#0052CC;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <h2 class="text-base font-bold mb-2" style="color:#1E293B;">数据隐私保护声明</h2>
+      <p class="text-sm leading-relaxed mb-4" style="color:#475569;">
+        我们郑重承诺：您的数据仅存储在本地服务器，平台不会以任何形式收集、查看、复制或外泄您的原始数据。
+        所有上传文件仅用于当前会话的数据分析，AI 模型仅接收表结构元数据，不接触完整数据记录。
+        请放心使用。
+      </p>
+      <label class="flex items-center justify-center gap-1.5 mb-3 cursor-pointer">
+        <input id="chkNoMorePrivacy" type="checkbox" class="w-3.5 h-3.5" style="accent-color:#0052CC;" />
+        <span class="text-xs" style="color:#94A3B8;">下次不再提醒</span>
+      </label>
+      <button id="btnConfirmPrivacy" class="w-full py-2.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all" style="background:#0052CC;">
+        已知晓，开始使用
+      </button>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- Main Content Area                                                   -->
+  <!-- ================================================================= -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: 数据接入                                                    -->
+    <!-- ============================================================== -->
+    <section id="tab-import" class="tab-panel flex-1 flex overflow-hidden">
+      <aside class="sidebar-panel">
+        <h2 class="sidebar-title">数据概览</h2>
+        <div id="sidebarOverview" class="text-xs" style="color:#94A3B8; line-height:1.6;">请先上传 CSV 或 Excel 文件。</div>
+        <div id="sidebarColumns" class="space-y-0.5" style="margin-bottom:1.5rem;"></div>
+
+        <div class="border-t pt-3" style="border-color:#E2E8F0;">
+          <h2 class="sidebar-title text-sm mb-3">LLM 配置</h2>
+          <div class="flex flex-col gap-2">
+            <div>
+              <label for="globalApiKey" class="sidebar-label">API Key</label>
+              <input id="globalApiKey" type="password" autocomplete="off" placeholder="sk-..." class="input-field w-full px-3 py-2 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;" />
+            </div>
+            <div>
+              <label for="globalBaseUrl" class="sidebar-label">Base URL</label>
+              <input id="globalBaseUrl" type="url" autocomplete="off" placeholder="https://api.openai.com/v1" class="input-field w-full px-3 py-2 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;" />
+            </div>
+            <div>
+              <label for="globalModelName" class="sidebar-label">Model Name</label>
+              <input id="globalModelName" type="text" autocomplete="off" placeholder="gpt-4o" class="input-field w-full px-3 py-2 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;" />
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button id="btnSaveSettings" class="flex-1 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all" style="background:#0052CC;">保存</button>
+            <button id="btnClearSettings" class="px-3 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all" style="background:#EF4444;">清空</button>
+          </div>
+          <p id="settingsStatus" class="text-xs text-center mt-2 hidden"></p>
+        </div>
+
+        <div class="border-t pt-3 mt-3" style="border-color:#E2E8F0;">
+          <h2 class="sidebar-title text-sm mb-3">账号</h2>
+          <!-- Logged out -->
+          <div id="loginForm" class="flex flex-col gap-2">
+            <input id="loginUsername" type="text" autocomplete="off" placeholder="用户名" class="input-field w-full px-3 py-2 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;" />
+            <input id="loginPassword" type="password" autocomplete="off" placeholder="密码" class="input-field w-full px-3 py-2 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;" />
+            <div class="flex gap-2">
+              <button id="btnLogin" class="flex-1 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all" style="background:#0052CC;">登录</button>
+              <button id="btnRegister" class="flex-1 py-2 text-sm font-medium rounded-lg hover:opacity-90 transition-all" style="background:#F1F5F9; color:#64748B; border:1px solid #E2E8F0;">注册</button>
+            </div>
+            <p id="loginStatus" class="text-xs text-center hidden"></p>
+          </div>
+          <!-- Logged in -->
+          <div id="loginInfo" class="hidden">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-2 h-2 rounded-full" style="background:#10B981;"></span>
+              <span id="loginInfoName" class="text-sm font-medium" style="color:#1E293B;"></span>
+              <span id="loginInfoRole" class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#E0E7FF; color:#4338CA;"></span>
+            </div>
+            <div class="flex gap-2">
+              <button id="btnLogout" class="flex-1 py-1.5 text-xs font-medium rounded-lg hover:opacity-90 transition-all" style="background:#FEE2E2; color:#991B1B;">退出</button>
+              <button id="btnUserMgmt" class="hidden flex-1 py-1.5 text-xs font-medium rounded-lg hover:opacity-90 transition-all" style="background:#F1F5F9; color:#64748B; border:1px solid #E2E8F0;">用户管理</button>
+            </div>
+            <button id="btnDeleteAccount" class="w-full mt-1.5 py-1 text-xs rounded-lg hover:opacity-80 transition-all" style="color:#94A3B8; background:none; border:none;">注销账号</button>
+          </div>
+        </div>
+      </aside>
+      <div class="flex-1 flex flex-col items-center justify-center p-8">
+        <div id="uploadZone" class="upload-zone">
+          <svg class="upload-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p class="upload-title">点击或拖拽 CSV / Excel 文件至此处</p>
+          <p class="upload-hint">支持 .csv / .xls / .xlsx 格式，最大 50 MB</p>
+          <input id="fileInput" type="file" accept=".csv,.xls,.xlsx" class="hidden" />
+        </div>
+        <div id="loadingIndicator" class="hidden flex flex-col items-center gap-3 mt-5">
+          <div class="spinner" style="width:1.5rem; height:1.5rem;"></div>
+          <p class="upload-loading-text">正在解析表格结构...</p>
+        </div>
+        <div id="uploadStatus" class="mt-4 text-sm text-gray-500 hidden"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: 数据理解（Stepper: 数据总览 / 数据清洗）                     -->
+    <!-- ============================================================== -->
+    <section id="tab-understanding" class="tab-panel hidden flex-1 flex flex-col overflow-hidden">
+      <!-- Stepper -->
+      <div class="stepper-bar" id="stepperBar">
+        <button class="stepper-step active" data-step="overview">
+          <span class="stepper-num">1</span>
+          <span class="stepper-label">数据总览</span>
+        </button>
+        <svg class="stepper-divider" width="24" height="24" fill="none" stroke="#CBD5E1" stroke-width="2"><path stroke-linecap="round" d="M9 5l7 7-7 7"/></svg>
+        <button class="stepper-step" data-step="cleaning">
+          <span class="stepper-num">2</span>
+          <span class="stepper-label">数据清洗</span>
+        </button>
+      </div>
+
+      <!-- Stage 2a: Data Overview -->
+      <div id="stage-overview" class="flex-1 overflow-y-auto p-6">
+        <div id="overviewEmpty" class="flex flex-col items-center justify-center h-full" style="color:#94A3B8;">
+          <svg class="w-16 h-16 mb-4" style="color:#CBD5E1;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <p class="text-sm">请先在「数据接入」上传表格，再返回查看数据总览。</p>
+        </div>
+        <div id="overviewContent" class="hidden">
+          <!-- Summary cards row -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="overviewCards"></div>
+          <!-- Field classification + quality -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+            <div class="card" style="padding:1.25rem 1.5rem;">
+              <h3 class="card-heading mb-3">字段分类</h3>
+              <div id="fieldTypeChart" style="height:180px;"></div>
+            </div>
+            <div class="card" style="padding:1.25rem 1.5rem;">
+              <h3 class="card-heading mb-3">AI 数据摘要</h3>
+              <div id="aiSummaryContent" class="text-sm leading-relaxed" style="color:#475569;">
+                <div class="flex items-center gap-2" style="color:#94A3B8;">
+                  <div class="spinner w-4 h-4"></div>
+                  <span>正在生成摘要...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Sample data table -->
+          <div class="card mb-6" style="padding:1.25rem 1.5rem;">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="card-heading" style="margin-bottom:0;">样例数据</h3>
+              <div class="flex gap-2" id="sampleTabBtns">
+                <button class="sample-tab-btn active" data-sample="head">前 5 行</button>
+                <button class="sample-tab-btn" data-sample="tail">后 5 行</button>
+              </div>
+            </div>
+            <div class="overflow-x-auto" id="sampleTable"></div>
+          </div>
+          <!-- Column detail cards -->
+          <h3 class="card-heading mb-3">字段详情</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="columnCards"></div>
+        </div>
+      </div>
+
+      <!-- Stage 2b: Data Cleaning -->
+      <div id="stage-cleaning" class="hidden flex-1 overflow-y-auto p-6">
+        <div id="cleaningEmpty" class="flex flex-col items-center justify-center h-full" style="color:#94A3B8;">
+          <svg class="w-16 h-16 mb-4" style="color:#CBD5E1;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+          <p class="text-sm">请先完成数据总览后再进入清洗阶段。</p>
+        </div>
+        <div id="cleaningContent" class="hidden">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="section-heading">数据清洗</h2>
+            <div class="flex gap-2">
+              <button id="btnRefreshCleaning" class="text-xs text-brand hover:text-brand-hover font-medium transition-colors">重新检测</button>
+            </div>
+          </div>
+          <div id="cleaningPanels" class="space-y-3 mb-6"></div>
+          <div id="cleaningLog" class="card mb-4 hidden" style="padding:0.75rem 1rem;">
+            <h4 class="text-xs font-semibold mb-2" style="color:#64748B;">操作日志</h4>
+            <div id="cleaningLogEntries" class="text-xs space-y-0.5" style="color:#475569; font-family:monospace;"></div>
+          </div>
+          <button id="btnApplyCleaning" class="w-full py-2.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed" style="background:#0052CC;">
+            应用清洗
+          </button>
+          <p id="cleaningResult" class="text-sm text-center mt-3 hidden"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: 智能分析（Notebook 模式）                                   -->
+    <!-- ============================================================== -->
+    <section id="tab-analysis" class="tab-panel hidden flex-1 flex overflow-hidden">
+      <!-- Left: Analysis history timeline -->
+      <div class="notebook-sidebar" id="notebookSidebar">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold" style="color:#1E293B;">分析历史</h2>
+          <button id="btnNewAnalysis" class="text-xs font-medium hover:underline" style="color:#0052CC; background:none; border:none;">新建</button>
+        </div>
+        <div id="notebookTimeline" class="flex flex-col gap-1.5">
+          <p class="text-xs" style="color:#94A3B8;">暂无分析记录，输入问题开始探索数据。</p>
+        </div>
+      </div>
+
+      <!-- Right: Analysis cards area -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div id="analysisCardsArea" class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div id="analysisEmptyState" class="flex flex-col items-center justify-center h-full text-center">
+            <div class="w-20 h-20 rounded-full flex items-center justify-center mb-5" style="background:rgba(0,82,204,0.06);">
+              <svg class="w-10 h-10" style="color:#0052CC;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+            </div>
+            <h2 class="section-heading mb-2">智能数据分析</h2>
+            <p class="text-sm max-w-md leading-relaxed mb-1" style="color:#94A3B8;">用自然语言提问，AI 将规划分析方案、执行计算并解读结果。</p>
+            <p class="text-xs" style="color:#CBD5E1;">例如：各地区的销售额趋势如何？哪些因素与客户价值最相关？</p>
+          </div>
+        </div>
+        <!-- Input bar -->
+        <div class="px-6 py-4" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
+          <div class="max-w-4xl mx-auto flex items-end gap-3">
+            <textarea id="analysisInput"
+                      class="flex-1 px-4 py-3 text-sm border rounded-2xl resize-none
+                             focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand
+                             transition-all duration-200 bg-gray-50"
+                      style="border-color:#E2E8F0;"
+                      rows="1" placeholder="输入您的问题..." autocomplete="off"></textarea>
+            <button id="btnSendAnalysis"
+                    class="flex-shrink-0 w-10 h-10 text-white rounded-full
+                           flex items-center justify-center hover:opacity-90 transition-all
+                           duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                    style="background:#0052CC; box-shadow:0 2px 8px rgba(0,82,204,0.25);"
+                    title="发送">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: 模型训练（保持原有逻辑）                                     -->
+    <!-- ============================================================== -->
+    <section id="tab-training" class="tab-panel hidden flex-1 overflow-y-auto p-6">
+      <div class="max-w-2xl mx-auto space-y-5">
+        <h2 class="section-heading">模型训练控制台</h2>
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <p class="text-xs mb-4" style="color:#94A3B8;">选择目标变量和影响因素，系统将自动训练多元线性回归模型。</p>
+          <div class="flex flex-col gap-1.5 mb-4">
+            <label for="trainTargetCol" class="sidebar-label">目标变量 (Y)</label>
+            <select id="trainTargetCol" class="input-field w-full px-3 py-2.5 text-sm border rounded-lg bg-gray-50" style="border-color:#E2E8F0;">
+              <option value="">-- 请选择目标列（仅数值型） --</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1.5 mb-5">
+            <div class="flex justify-between items-center">
+              <label class="sidebar-label" style="margin-bottom:0;">影响因素 (X)</label>
+              <div class="flex gap-3">
+                <button id="btnSelectAllX" class="text-xs font-medium hover:underline cursor-pointer" style="color:#0052CC; background:none; border:none;">全选所有</button>
+                <button id="btnClearAllX" class="text-xs font-medium hover:underline cursor-pointer" style="color:#94A3B8; background:none; border:none;">清空</button>
+              </div>
+            </div>
+            <div id="trainFeatureChips" class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1"></div>
+          </div>
+          <button id="btnStartTrain" class="w-full py-2.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed" style="background:#0052CC; box-shadow:0 1px 3px rgba(0,82,204,0.2);">开始训练模型</button>
+          <p id="trainSelectError" class="text-xs text-red-500 mt-2 hidden"></p>
+        </div>
+        <div id="trainProgressArea" class="hidden card" style="padding:1.25rem 1.5rem;">
+          <div class="flex justify-between text-xs mb-1" style="color:#64748B;"><span>训练进度</span><span id="trainProgressPct">0%</span></div>
+          <div class="w-full h-2 rounded-full overflow-hidden mb-3" style="background:#E2E8F0;"><div id="trainProgressFill" class="training-progress-fill" style="width:0%"></div></div>
+          <div id="trainLogs" class="rounded-xl p-4 text-xs font-mono space-y-1 max-h-40 overflow-y-auto" style="background:#F8FAFC; border:1px solid #E2E8F0; color:#475569;"></div>
+        </div>
+        <div id="trainResultArea" class="hidden card" style="padding:1.25rem 1.5rem;"></div>
+        <button id="btnEnterSandboxFromTrain" class="hidden w-full py-2.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all" style="background:#059669; box-shadow:0 1px 3px rgba(5,150,105,0.2);">进入实时模拟沙盘</button>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 5: 预测模拟沙盘（保持原有逻辑）                                 -->
+    <!-- ============================================================== -->
+    <section id="tab-sandbox" class="tab-panel hidden flex-1 overflow-hidden">
+      <div id="sandboxEmpty" class="flex flex-col items-center justify-center h-full text-center p-6">
+        <div class="w-20 h-20 rounded-full flex items-center justify-center mb-5" style="background:rgba(0,82,204,0.06);">
+          <svg class="w-10 h-10" style="color:#0052CC;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <h2 class="section-heading mb-2">预测模拟沙盘 (What-If Simulation)</h2>
+        <p class="text-sm max-w-md leading-relaxed mb-6" style="color:#94A3B8;">基于已训练的回归模型，通过拖动滑块实时调节各影响因素 (X)，模拟预测目标变量 (Y) 的变化。请先在「模型训练」中完成模型拟合。</p>
+        <div id="sandboxStatus" class="text-xs" style="color:#94A3B8;">尚未训练模型 — 请在「模型训练」Tab 中完成训练后解锁。</div>
+      </div>
+      <div id="sandboxActive" class="hidden flex-1 flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
+        <div class="w-full lg:w-[38%] xl:w-[34%] overflow-y-auto flex-shrink-0 space-y-4 pr-1" id="sandboxSliders">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5" style="color:#0052CC;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <h2 class="section-heading text-base">参数调节</h2>
+            </div>
+            <button id="btnResetSliders" class="text-xs font-medium hover:underline cursor-pointer" style="color:#0052CC; background:none; border:none;">恢复默认</button>
+          </div>
+        </div>
+        <div class="flex-1 flex flex-col gap-5 min-w-0">
+          <div class="card text-center py-8 px-6">
+            <p class="text-xs uppercase tracking-wider mb-2" style="color:#94A3B8;">预测结果</p>
+            <p id="sandboxPrediction" class="text-5xl md:text-6xl font-extrabold tracking-tight" style="color:#0052CC; font-variant-numeric:tabular-nums;">0</p>
+            <p id="sandboxTargetLabel" class="text-sm mt-1" style="color:#64748B;">—</p>
+            <p class="text-xs mt-3" style="color:#94A3B8;" id="sandboxFormula"></p>
+          </div>
+          <div class="card flex flex-col mb-4" style="min-height:280px;">
+            <h3 class="card-heading px-5 pt-4">各因素贡献分解</h3>
+            <p class="text-[10px] px-5" style="color:#94A3B8;">每个特征的系数 x 当前值 = 对预测结果的贡献</p>
+            <div id="sandboxWaterfall" style="flex:1; width:100%; min-height:240px;"></div>
+          </div>
+          <div class="card flex flex-col flex-1" style="min-height:200px;">
+            <h3 class="card-heading px-5 pt-4">场景对比</h3>
+            <div id="sandboxScenarioChart" style="flex:1; width:100%; min-height:180px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 6: 用户管理（仅 admin 可见）                                   -->
+    <!-- ============================================================== -->
+    <section id="tab-admin" class="tab-panel hidden flex-1 overflow-y-auto p-6">
+      <div class="max-w-3xl mx-auto space-y-5">
+        <h2 class="section-heading">用户管理</h2>
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <h3 class="card-heading mb-3">用户列表</h3>
+          <div id="adminUserTable" class="overflow-x-auto"></div>
+        </div>
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <h3 class="card-heading mb-3">最近上传记录</h3>
+          <div id="adminUploadsTable" class="overflow-x-auto"></div>
+        </div>
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <h3 class="card-heading mb-3">最近分析记录</h3>
+          <div id="adminAnalysisTable" class="overflow-x-auto"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

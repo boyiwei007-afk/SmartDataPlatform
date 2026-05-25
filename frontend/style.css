@@ -1,0 +1,1194 @@
+/* =========================================================================
+   SmartAnalysis Pro — Design System
+   "Light & airy" — inspired by Notion / Apple HIG
+
+   Palette
+     bg-page:    #F8FAFC  (slate-50)
+     bg-card:    #FFFFFF
+     border:     #E2E8F0  (slate-200)
+     text-primary:  #1E293B  (slate-800)
+     text-secondary: #64748B (slate-500)
+     text-muted:  #94A3B8  (slate-400)
+     brand:       #0052CC
+     shadow-card: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04)
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   0.  Fonts & global reset
+   ------------------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F8FAFC;
+  color: #1E293B;
+}
+
+/* -------------------------------------------------------------------------
+   1.  Header — three-column centered layout  (68px)
+   ------------------------------------------------------------------------- */
+#mainHeader {
+  height: 68px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04);
+}
+
+/* ---- Three-column flex container ---- */
+.nav-three-col {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 1.5rem;
+  max-width: 100%;
+}
+
+/* Left column: Logo — flex:1 pushes the center tabs to true center */
+.nav-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+/* Right column: counterweight for visual balance */
+.nav-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Center column: Tabs — flex:none, naturally centered */
+.nav-center {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;  /* spacious gap between tabs */
+}
+
+/* ---- Logo ---- */
+.nav-logo-icon {
+  width: 2.25rem;   /* 36px */
+  height: 2.25rem;
+  background: #0052CC;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,82,204,0.18);
+}
+
+.nav-logo-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #FFFFFF;
+}
+
+.nav-title {
+  font-size: 1.0625rem;  /* 17px */
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* ---- Tab buttons (enlarged, Apple-segmented-control style) ---- */
+.tab-btn {
+  position: relative;
+  padding: 0.5rem 0.25rem;
+  font-size: 0.9375rem;     /* ~15px, text-base */
+  font-weight: 500;
+  color: #64748B;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+  /* The underline will be positioned via ::after */
+}
+
+.tab-btn:hover {
+  color: #334155;
+}
+
+/* Active tab: brand blue, semi-bold */
+.tab-btn.active {
+  color: #0052CC;
+  font-weight: 600;
+}
+
+/* Active indicator: 3px blue pill, 60% width, centered */
+.tab-btn::after {
+  content: "";
+  position: absolute;
+  bottom: -16px;            /* anchors snugly at the header bottom edge */
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: #0052CC;
+  border-radius: 3px 3px 0 0;
+  opacity: 0;
+  transform: scaleX(0.6);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn.active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* Disabled tabs */
+.tab-btn.disabled {
+  color: #CBD5E1;
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.tab-btn.disabled:hover {
+  color: #CBD5E1;
+}
+
+/* Tooltip on disabled tabs */
+.tab-btn.disabled[data-tooltip]:hover::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1E293B;
+  color: #FFFFFF;
+  font-size: 0.6875rem;
+  font-weight: 400;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  white-space: nowrap;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Tab panel visibility */
+.tab-panel.hidden { display: none !important; }
+
+/* ---- Tab slide transitions ---- */
+@keyframes tabSlideInLeft {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tabSlideOutLeft {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes tabSlideInRight {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tabSlideOutRight {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(16px); }
+}
+
+.tab-slide-in-left  { animation: tabSlideInLeft  0.25s ease-out; }
+.tab-slide-out-left { animation: tabSlideOutLeft 0.2s ease-in; }
+.tab-slide-in-right { animation: tabSlideInRight 0.25s ease-out; }
+.tab-slide-out-right{ animation: tabSlideOutRight 0.2s ease-in; }
+
+/* -------------------------------------------------------------------------
+   2.  Cards  (universal card style)
+   ------------------------------------------------------------------------- */
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04);
+}
+
+.sidebar-card {
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+}
+
+/* -------------------------------------------------------------------------
+   3.  Input fields
+   ------------------------------------------------------------------------- */
+.input-field {
+  color: #1E293B;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-field::placeholder { color: #94A3B8; font-weight: 400; }
+.input-field:focus::placeholder { color: #CBD5E1; }
+
+/* -------------------------------------------------------------------------
+   4.  Upload zone  (refined, compact)
+   ------------------------------------------------------------------------- */
+.upload-zone {
+  max-width: 34rem;
+  border: 2px dashed #CBD5E1;
+  border-radius: 1rem;
+  background: rgba(239, 246, 255, 0.5);  /* blue-50/30 ≈ bg-blue-50 at 50% */
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.25s ease, background-color 0.25s ease, transform 0.25s ease;
+}
+
+.upload-zone:hover {
+  border-color: #0052CC;
+  background: rgba(239, 246, 255, 0.8);
+}
+
+/* Drag-over state */
+.upload-zone.drag-over {
+  border-color: #0052CC !important;
+  background-color: rgba(0, 82, 204, 0.06) !important;
+  transform: scale(1.015);
+}
+
+/* Uploading pulse */
+@keyframes uploadPulse {
+  0%, 100% { border-color: #CBD5E1; }
+  50%      { border-color: #0052CC; }
+}
+
+.upload-zone.uploading {
+  animation: uploadPulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* Upload icon */
+.upload-icon {
+  width: 3rem;
+  height: 3rem;
+  color: #94A3B8;
+  margin: 0 auto 1rem;
+  display: block;
+  transition: color 0.25s ease;
+}
+
+.upload-zone:hover .upload-icon { color: #64748B; }
+.upload-zone.drag-over .upload-icon { color: #0052CC !important; }
+
+/* Upload text */
+.upload-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.upload-hint {
+  font-size: 0.8125rem;
+  color: #94A3B8;
+}
+
+/* Loading indicator under upload zone */
+.upload-loading-text {
+  font-size: 0.8125rem;
+  color: #94A3B8;
+}
+
+/* -------------------------------------------------------------------------
+   5.  Sidebar  (Tab 1 & Tab 3)
+   ------------------------------------------------------------------------- */
+.sidebar-panel {
+  width: 17rem;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+  padding: 1.5rem;  /* 24px */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 1.125rem;  /* 18px */
+  font-weight: 700;
+  color: #1E293B;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+/* -------------------------------------------------------------------------
+   6.  Toast notifications
+   ------------------------------------------------------------------------- */
+@keyframes toastSlideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes toastSlideOut {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(120%); opacity: 0; }
+}
+
+.toast {
+  pointer-events: auto;
+  max-width: 22rem;
+  padding: 0.75rem 1rem;
+  background: #FFFFFF;
+  border: 1px solid #FCA5A5;
+  border-left: 3px solid #EF4444;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #1E293B;
+  animation: toastSlideIn 0.35s ease-out;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.toast.removing { animation: toastSlideOut 0.3s ease-in forwards; }
+
+.toast .toast-icon {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  color: #EF4444;
+  margin-top: 0.125rem;
+}
+
+/* -------------------------------------------------------------------------
+   7.  Spinner  (brand blue)
+   ------------------------------------------------------------------------- */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid #E2E8F0;
+  border-top-color: #0052CC;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+/* -------------------------------------------------------------------------
+   8.  Analysis tab — chart cards
+   ------------------------------------------------------------------------- */
+.chart-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04);
+  padding: 1.25rem 1.5rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.chart-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.chart-box {
+  width: 100%;
+  min-height: 280px;
+}
+
+/* Chart column selector chips */
+.chart-col-chip {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  border: 1px solid #E2E8F0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #64748B;
+  background: #FFFFFF;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.chart-col-chip:hover {
+  border-color: #0052CC;
+  color: #0052CC;
+  background: rgba(0,82,204,0.04);
+}
+
+.chart-col-chip.active {
+  background: #0052CC;
+  color: #FFFFFF;
+  border-color: #0052CC;
+}
+
+/* -------------------------------------------------------------------------
+   9.  Training tab — feature chips
+   ------------------------------------------------------------------------- */
+.feature-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748B;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.feature-chip:hover {
+  border-color: #0052CC;
+  color: #0052CC;
+  background: rgba(0,82,204,0.03);
+}
+
+.feature-chip.selected {
+  border-color: #0052CC;
+  color: #0052CC;
+  background: rgba(0,82,204,0.06);
+  font-weight: 600;
+}
+
+.feature-chip input[type="checkbox"] { display: none; }
+
+/* -------------------------------------------------------------------------
+   10.  Training progress
+   ------------------------------------------------------------------------- */
+.training-progress-fill {
+  background: linear-gradient(90deg, #0052CC, #3B82F6);
+  box-shadow: 0 0 8px rgba(0,82,204,0.2);
+  transition: width 0.5s ease-out;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.train-log-line {
+  animation: logFadeIn 0.35s ease;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+@keyframes logFadeIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* -------------------------------------------------------------------------
+   11.  Chat area
+   ------------------------------------------------------------------------- */
+.ai-bubble {
+  line-height: 1.6;
+  color: #334155;
+}
+
+.ai-bubble p { margin: 0.25em 0; }
+
+#chatInput {
+  max-height: 7.5rem;
+  line-height: 1.5;
+  color: #1E293B;
+}
+
+.code-block-wrapper {
+  margin-top: 0.75rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #F8FAFC;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: #F1F5F9;
+  border-bottom: 1px solid #E2E8F0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.75rem;
+  color: #64748B;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.code-block-header:hover { background: #E2E8F0; }
+
+.code-block-header .toggle-icon {
+  transition: transform 0.2s ease;
+  color: #94A3B8;
+}
+
+.code-block-header.collapsed .toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.code-block-body {
+  padding: 0.75rem;
+  font-family: "SF Mono", "Fira Code", "Consolas", "Courier New", monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+  color: #334155;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.code-block-body.hidden { display: none; }
+
+.chart-container {
+  margin-top: 0.75rem;
+  width: 100%;
+  min-height: 300px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+}
+
+/* Typing indicator dots */
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40%           { transform: scale(1); opacity: 1; }
+}
+
+.typing-dots {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  background: #94A3B8;
+  border-radius: 50%;
+  animation: dotPulse 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* -------------------------------------------------------------------------
+   12.  Sidebar column list — missing-rate bar
+   ------------------------------------------------------------------------- */
+.missing-bar-track {
+  display: inline-block;
+  width: 2.5rem;
+  height: 4px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: 0.375rem;
+  overflow: hidden;
+}
+
+.missing-bar-fill {
+  display: block;
+  height: 100%;
+  background: #FCA5A5;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* -------------------------------------------------------------------------
+   13.  R² gauge ring
+   ------------------------------------------------------------------------- */
+.r2-gauge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+}
+
+.r2-gauge svg { transform: rotate(-90deg); }
+.r2-gauge .r2-bg { fill: none; stroke: #E2E8F0; stroke-width: 5; }
+
+.r2-gauge .r2-fill {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.r2-gauge .r2-text {
+  position: absolute;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+/* -------------------------------------------------------------------------
+   14.  Exploratory stats table
+   ------------------------------------------------------------------------- */
+#exploratoryTable table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+
+#exploratoryTable th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+#exploratoryTable td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #F1F5F9;
+  white-space: nowrap;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+#exploratoryTable tr:hover td { background: #F8FAFC; }
+
+/* -------------------------------------------------------------------------
+   15.  Sandbox range slider (WebKit + Firefox)
+   ------------------------------------------------------------------------- */
+.sandbox-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sandbox-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0052CC;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0,82,204,0.3);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.sandbox-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 8px rgba(0,82,204,0.45);
+}
+
+.sandbox-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0052CC;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0,82,204,0.3);
+  cursor: pointer;
+}
+
+/* Number input spin-button hide (Chrome) */
+.sandbox-number::-webkit-inner-spin-button,
+.sandbox-number::-webkit-outer-spin-button {
+  opacity: 0.5;
+}
+
+/* -------------------------------------------------------------------------
+   16.  Page section headings
+   ------------------------------------------------------------------------- */
+.section-heading {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1E293B;
+  letter-spacing: -0.01em;
+}
+
+.card-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* =========================================================================
+   17.  Modal overlay + card
+   ========================================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.modal-overlay.hidden { display: none !important; }
+
+.modal-card {
+  padding: 1.5rem;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* =========================================================================
+   18.  Stepper bar (Tab 2)
+   ========================================================================= */
+.stepper-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  flex-shrink: 0;
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.stepper-step:hover { background: #F1F5F9; }
+
+.stepper-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #E2E8F0;
+  color: #94A3B8;
+  transition: all 0.2s ease;
+}
+
+.stepper-step.active .stepper-num {
+  background: #0052CC;
+  color: #FFFFFF;
+}
+
+.stepper-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #94A3B8;
+  transition: color 0.2s ease;
+}
+
+.stepper-step.active .stepper-label {
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.stepper-divider {
+  flex-shrink: 0;
+}
+
+/* =========================================================================
+   19.  Overview summary cards (Tab 2a)
+   ========================================================================= */
+.overview-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04);
+}
+
+.overview-card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1E293B;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.overview-card-label {
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.125rem;
+}
+
+/* =========================================================================
+   20.  Sample data table tabs
+   ========================================================================= */
+.sample-tab-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid #E2E8F0;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.sample-tab-btn:hover { border-color: #0052CC; color: #0052CC; }
+
+.sample-tab-btn.active {
+  background: #0052CC;
+  color: #FFFFFF;
+  border-color: #0052CC;
+}
+
+/* =========================================================================
+   21.  Column detail cards (Tab 2a)
+   ========================================================================= */
+.column-detail-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.column-detail-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+.column-detail-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1E293B;
+  margin-bottom: 0.5rem;
+  word-break: break-all;
+}
+
+.sparkline-bar {
+  display: inline-block;
+  width: 0.375rem;
+  background: #0052CC;
+  border-radius: 1px 1px 0 0;
+  vertical-align: bottom;
+  min-height: 1px;
+}
+
+/* =========================================================================
+   22.  Cleaning panels (Tab 2b)
+   ========================================================================= */
+.cleaning-panel {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04);
+}
+
+.cleaning-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.cleaning-panel-header:hover { background: #F8FAFC; }
+
+.cleaning-panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cleaning-panel-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.cleaning-panel-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.cleaning-panel-badge.warning { background: #FEF3C7; color: #D97706; }
+.cleaning-panel-badge.ok { background: #D1FAE5; color: #059669; }
+
+.cleaning-panel-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: #94A3B8;
+  transition: transform 0.2s ease;
+}
+
+.cleaning-panel-header.expanded .cleaning-panel-chevron {
+  transform: rotate(180deg);
+}
+
+.cleaning-panel-body {
+  padding: 0 1.25rem 1rem;
+}
+
+.cleaning-panel-body.hidden { display: none; }
+
+/* =========================================================================
+   23.  Notebook layout (Tab 3)
+   ========================================================================= */
+.notebook-sidebar {
+  width: 14rem;
+  flex-shrink: 0;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+  padding: 1.25rem 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.notebook-timeline-item {
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.notebook-timeline-item:hover { background: #F8FAFC; border-color: #E2E8F0; }
+
+.notebook-timeline-item.active {
+  background: rgba(0,82,204,0.06);
+  border-color: rgba(0,82,204,0.2);
+}
+
+.notebook-timeline-question {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notebook-timeline-time {
+  font-size: 0.625rem;
+  color: #94A3B8;
+  margin-top: 0.125rem;
+}
+
+/* =========================================================================
+   24.  Analysis card (Tab 3)
+   ========================================================================= */
+.analysis-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+.analysis-card-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.analysis-card-question {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.analysis-card-translation {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: #F8FAFC;
+  border-radius: 0.5rem;
+  line-height: 1.5;
+}
+
+.analysis-card-body { padding: 1.25rem; }
+
+.analysis-chart-wrap {
+  width: 100%;
+  min-height: 320px;
+  margin-bottom: 1rem;
+}
+
+.analysis-stats-table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.analysis-stats-table th {
+  text-align: left;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.analysis-stats-table td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid #F1F5F9;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-card-interpretation {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #F1F5F9;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: #334155;
+  background: #FCFCFE;
+}
+
+.analysis-card-suggestions {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #F1F5F9;
+  font-size: 0.75rem;
+  color: #64748B;
+  background: #F8FAFC;
+}
+
+.analysis-card-suggestions span {
+  color: #0052CC;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.analysis-card-suggestions span:hover { color: #0043A8; }
+
+/* =========================================================================
+   25.  SSE status / progress indicator
+   ========================================================================= */
+.sse-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: #64748B;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sse-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #0052CC;
+  animation: ssePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ssePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.sse-progress-track {
+  flex: 1;
+  height: 4px;
+  background: #E2E8F0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sse-progress-fill {
+  height: 100%;
+  background: #0052CC;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* =========================================================================
+   26.  Analysis interpretation streaming cursor
+   ========================================================================= */
+.streaming-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  background: #0052CC;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: cursorBlink 0.8s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* =========================================================================
+   27.  Sandbox scenario chips + sensitivity + optimizer
+   ========================================================================= */
+.scenario-chip {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.scenario-chip:hover {
+  border-color: #0052CC !important;
+  color: #0052CC !important;
+  background: rgba(0,82,204,0.04) !important;
+}
+
+.scenario-chip.active {
+  border-color: #0052CC !important;
+  color: #0052CC !important;
+  background: rgba(0,82,204,0.08) !important;
+}
+
+/* =========================================================================
+   28.  Training result diagnostics
+   ========================================================================= */
+.train-diag-section { margin-top: 0.75rem; }
+.train-diag-title { font-size: 0.75rem; font-weight: 600; color: #64748B; margin-bottom: 0.25rem; }
