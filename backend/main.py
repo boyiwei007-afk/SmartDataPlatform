@@ -70,7 +70,17 @@ UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Session context: stores previous analysis results per file for multi-turn conversations
+# Limited to 20 most-recently-used files to prevent unbounded memory growth.
 _session_context: dict[str, str] = {}
+_MAX_CONTEXT_FILES = 20
+
+
+def _set_context(key: str, value: str) -> None:
+    """Store analysis context with LRU eviction."""
+    _session_context[key] = value
+    while len(_session_context) > _MAX_CONTEXT_FILES:
+        oldest = next(iter(_session_context))
+        del _session_context[oldest]
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +279,17 @@ async def upload_file(file: UploadFile = File(...),
             detail=f"不支持的文件格式 '{suffix}'。请上传 CSV 或 Excel 文件。",
         )
 
+    # --- validate file size (50 MB) ---------------------------------------
+    MAX_BYTES = 50 * 1024 * 1024
+    file.file.seek(0, 2)  # seek to end
+    fsize = file.file.tell()
+    file.file.seek(0)     # seek back to start
+    if fsize > MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件过大（{fsize / 1024 / 1024:.1f} MB），上限为 50 MB。请压缩文件或拆分后重新上传。",
+        )
+
     # --- persist to disk ---------------------------------------------------
     save_path = UPLOAD_DIR / filename
     try:
@@ -383,6 +404,79 @@ class TrainResponse(BaseModel):
     feature_importance: dict[str, dict[str, float]] | None = None
     importance_note: str | None = None
     target_stats: dict[str, float] | None = None
+    warnings: list[str] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Training preview endpoint (lightweight, no model fitting)
+# ---------------------------------------------------------------------------
+@app.post("/preview-train", tags=["train"])
+async def preview_train(req: TrainRequest,
+                        current_user: dict = Depends(get_current_user)):
+    """Quick preview of training data quality before actual training.
+
+    Returns effective sample count, NaN rates, and warnings about
+    non-numeric features — so users know what to expect before clicking
+    "Start Training".
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    file_path = UPLOAD_DIR / req.filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件 '{req.filename}' 不存在。")
+
+    try:
+        df = _load_dataframe(req.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"无法读取数据文件: {exc}")
+
+    target = req.target_col.strip()
+    feats = [c.strip() for c in req.feature_cols if c.strip()]
+
+    # Basic validation
+    all_cols = set(df.columns)
+    missing = [c for c in ([target] + feats) if c not in all_cols]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"列 {missing} 在数据中不存在。")
+
+    # Run numeric coercion
+    sub = df[[target] + feats].copy()
+    total_rows = len(sub)
+    bad_feats: list[str] = []
+
+    for col in [target] + feats:
+        try:
+            sub[col] = pd.to_numeric(sub[col], errors="coerce")
+        except TypeError as exc:
+            raise HTTPException(status_code=400, detail=f"列 '{col}' 无法转换为数值: {exc}")
+        if col in feats and sub[col].isna().all():
+            bad_feats.append(col)
+
+    # Count Y NaN
+    y_nan = int(sub[target].isna().sum())
+    effective = total_rows - y_nan
+
+    # Per-feature NaN rates
+    feat_preview: dict[str, dict] = {}
+    for col in feats:
+        nan_count = int(sub[col].isna().sum())
+        feat_preview[col] = {
+            "nan_count": nan_count,
+            "nan_pct": round(nan_count / total_rows * 100, 2) if total_rows else 0,
+            "all_nan": bool(sub[col].isna().all()),
+        }
+
+    return {
+        "total_rows": total_rows,
+        "effective_rows": effective,
+        "y_dropped": y_nan,
+        "y_dropped_pct": round(y_nan / total_rows * 100, 2) if total_rows else 0,
+        "features": feat_preview,
+        "bad_features": bad_feats,
+        "warnings": [
+            f"'{f}' 不是数值列，将被排除" for f in bad_feats
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -426,6 +520,7 @@ async def train_model(req: TrainRequest,
             feature_importance=result.get("feature_importance"),
             importance_note=result.get("importance_note"),
             target_stats=result.get("target_stats"),
+            warnings=result.get("warnings"),
         )
     except ValueError as exc:
         logger.warning("Training validation error: %s", exc)
@@ -631,6 +726,10 @@ async def analyze(req: AnalyzeRequest,
             actions = combined_json.get("actions", [])
         except Exception as exc:
             logger.warning("Combined planning failed: %s", exc)
+            yield _sse_event("error", {
+                "message": f"LLM 调用失败: {exc}。请检查 API Key 和网络连接。",
+                "stage": "planning",
+            })
             translation_text = req.question
             column_mappings = []
             plan_text = ""
@@ -651,7 +750,7 @@ async def analyze(req: AnalyzeRequest,
                 chat_result = ask_data(enriched_query, req.table_schema, credentials)
                 answer = chat_result.get("answer", "")
                 yield _sse_event("interpretation", {"text": answer})
-                _session_context[req.filename] = f"Q: {req.question}\nA: {answer[:300]}"
+                _set_context(req.filename, f"Q: {req.question}\nA: {answer[:300]}")
                 record_analysis(current_user["username"], req.question, answer[:500], req.filename)
             except Exception as exc:
                 yield _sse_event("interpretation", {"text": f"(回答暂时不可用: {exc})"})
@@ -676,6 +775,50 @@ async def analyze(req: AnalyzeRequest,
                 logger.info("Mappings applied: %s", mapping_logs)
         except Exception as exc:
             logger.exception("Column mapping crash")
+            yield _sse_event("error", {
+                "message": f"列映射处理失败: {exc}",
+                "stage": "mapping",
+            })
+
+        # ---- Validate all column references before execution ----
+        actual_columns = set(str(c) for c in analysis_df.columns)
+        actual_columns = set(str(c) for c in analysis_df.columns)
+        # Build a whitelist of params whose values are NOT column names.
+        # We do this by consulting the registry's input_schema: any param whose
+        # schema description does NOT contain "列名" is not checked as a column.
+        try:
+            from services.analysis_registry import ANALYSIS_REGISTRY
+        except Exception:
+            ANALYSIS_REGISTRY = {}
+
+        def _column_param_names(func_name: str) -> set[str]:
+            """Return the subset of param names that are column references."""
+            entry = ANALYSIS_REGISTRY.get(func_name, {})
+            schema = entry.get("input_schema", {})
+            col_params: set[str] = set()
+            for pname, pdesc in schema.items():
+                if "列" in pdesc:  # "数值列名", "分类列名", "默认所有数值列", etc.
+                    col_params.add(pname)
+            return col_params
+
+        def _collect_missing_columns(func_name: str, params: dict) -> list[str]:
+            """Scan *params* for column-name values not present in *actual_columns*."""
+            col_params = _column_param_names(func_name)
+            missing: list[str] = []
+            for key, val in params.items():
+                if key not in col_params:
+                    continue  # not a column param, skip
+                if isinstance(val, str):
+                    if val not in actual_columns:
+                        missing.append(val)
+                elif isinstance(val, list):
+                    for item in val:
+                        if isinstance(item, str) and item not in actual_columns:
+                            missing.append(item)
+            return missing
+
+        # Pre-validate and collect missing-column info for the interpretation stage
+        _missing_col_info: list[str] = []  # human-readable messages for the LLM
 
         # ---- Stage 2: Execution ----
         total_actions = len(actions)
@@ -690,6 +833,25 @@ async def analyze(req: AnalyzeRequest,
             if not isinstance(params, dict):
                 params = {}
             chart_override = str(action.get("chart", ""))
+
+            # --- Column-name guard ---
+            missing_cols = _collect_missing_columns(func_name, params)
+            if missing_cols:
+                available_hint = ", ".join(sorted(actual_columns))
+                msg = (
+                    f"列 {missing_cols} 在数据中不存在。"
+                    f"当前可用列: [{available_hint}]"
+                )
+                _missing_col_info.append(f"[{func_name}] {msg}")
+                logger.warning("Column guard blocked '%s': %s", func_name, msg)
+                yield _sse_event("result", {
+                    "step": idx + 1,
+                    "function": func_name,
+                    "error": msg,
+                    "chart_type": chart_override or "table",
+                    "reason": str(action.get("reason", "")),
+                })
+                continue
 
             yield _sse_event("progress", {
                 "step": idx + 1,
@@ -735,6 +897,11 @@ async def analyze(req: AnalyzeRequest,
             try:
                 # Build a compact summary of results for the LLM
                 summary_parts: list[str] = []
+                # Prepend mapping diagnostics so the LLM can explain column issues
+                if mapping_logs:
+                    summary_parts.append("[列映射日志] " + "; ".join(mapping_logs))
+                if _missing_col_info:
+                    summary_parts.append("[列缺失提示] " + "; ".join(_missing_col_info))
                 for r in all_results:
                     if "error" in r:
                         summary_parts.append(f"[{r.get('function')}] 执行失败: {r['error']}")
@@ -756,6 +923,10 @@ async def analyze(req: AnalyzeRequest,
                     yield _sse_event("interpretation", {"text": token})
             except Exception as exc:
                 logger.warning("Interpretation failed: %s", exc)
+                yield _sse_event("error", {
+                    "message": f"AI 解读失败: {exc}",
+                    "stage": "interpretation",
+                })
                 yield _sse_event("interpretation", {
                     "text": f"(AI 解读暂时不可用: {exc})"
                 })
@@ -769,7 +940,7 @@ async def analyze(req: AnalyzeRequest,
                 context_parts.append(
                     f"[{r.get('function','')}] {json.dumps(r.get('stats',{}), ensure_ascii=False)[:300]}"
                 )
-        _session_context[req.filename] = "\n".join(context_parts[-6:])
+        _set_context(req.filename, "\n".join(context_parts[-6:]))
 
         # Record analysis history
         try:

@@ -110,8 +110,30 @@ def train_linear_regression(
     sub = df[cols_to_use].copy()
     total_before = len(sub)
 
+    bad_features: list[str] = []
     for col in cols_to_use:
-        sub[col] = pd.to_numeric(sub[col], errors="coerce")
+        try:
+            sub[col] = pd.to_numeric(sub[col], errors="coerce")
+        except TypeError as exc:
+            msg = str(exc)
+            if "arg must be a list" in msg or "1-d array" in msg:
+                raise ValueError(
+                    f"列 '{col}' 的数据格式异常，无法转换为数值。"
+                    f"请确认该列是否包含有效数据。"
+                ) from exc
+            raise
+
+        # After coercion, check if the column became entirely NaN
+        # (happens when a text/categorical column is selected as a feature)
+        if col in feature_cols and sub[col].isna().all():
+            bad_features.append(col)
+
+    if bad_features:
+        raise ValueError(
+            f"以下特征列无法转换为数值，不支持用于回归分析：{bad_features}。"
+            f"请选择数值型特征（如 Quantity、UnitPrice），"
+            f"而非文本/分类列（如 Country、Description）。"
+        )
 
     # =====================================================================
     # Stage 3a — drop rows where Y is NaN (useless for training)
@@ -145,6 +167,20 @@ def train_linear_regression(
             "Sample size (%d) small vs feature count (%d). R² may be unreliable.",
             n_samples, len(feature_cols),
         )
+
+    # ---- Detect high-cardinality features (likely ID columns) ----
+    high_cardinality: list[str] = []
+    for i, col in enumerate(feature_cols):
+        # After median imputation, count unique values
+        n_unique = len(np.unique(X_clean[:, i]))
+        ratio = n_unique / n_samples if n_samples > 0 else 0
+        if ratio > 0.5:
+            high_cardinality.append(col)
+            logger.warning(
+                "Feature '%s' has %d unique values (%.1f%% of samples), "
+                "likely an ID column rather than a true feature.",
+                col, n_unique, ratio * 100,
+            )
 
     # =====================================================================
     # Stage 4 — train model on raw (unstandardized) data
@@ -248,13 +284,16 @@ def train_linear_regression(
 
     # =====================================================================
     # Stage 5 — feature statistics (for sandbox slider bounds)
+    #
+    # Use P1 / P99 instead of raw min / max so that extreme outliers
+    # don't make the slider range unrealistically wide.
     # =====================================================================
     feature_stats: dict[str, dict[str, float]] = {}
     for i, col in enumerate(feature_cols):
         col_vals = X_clean[:, i]
         feature_stats[col] = {
-            "min": float(np.min(col_vals)),
-            "max": float(np.max(col_vals)),
+            "min": float(np.percentile(col_vals, 1)),
+            "max": float(np.percentile(col_vals, 99)),
             "mean": float(np.mean(col_vals)),
         }
 
@@ -361,6 +400,13 @@ def train_linear_regression(
         "model_comparison": model_comparison,
         "residual_std": round(float(np.std(residuals, ddof=len(feature_cols)+1)), 6),
     }
+
+    # ---- Warnings ----
+    if high_cardinality:
+        result["warnings"] = [
+            f"特征 '{c}' 的唯一值占比过高（>50%），可能是 ID 列而非有效特征，建议排除。"
+            for c in high_cardinality
+        ]
 
     return result
 

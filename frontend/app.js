@@ -41,6 +41,58 @@
   var TAB_ORDER = ["import", "understanding", "analysis", "training", "sandbox", "admin"];
 
   // =======================================================================
+  // Error Modal (unified entry point for all user-facing errors)
+  // =======================================================================
+  function showErrorModal(title, message, hint) {
+    // Remove any existing modal
+    var existing = document.querySelector(".error-modal-overlay");
+    if (existing) existing.remove();
+
+    var overlay = document.createElement("div");
+    overlay.className = "error-modal-overlay";
+
+    var card = document.createElement("div");
+    card.className = "error-modal-card";
+
+    var iconWrap = document.createElement("div");
+    iconWrap.className = "error-modal-icon error";
+    iconWrap.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor" stroke="none"/></svg>';
+
+    var titleEl = document.createElement("div");
+    titleEl.className = "error-modal-title";
+    titleEl.textContent = title;
+
+    var msgEl = document.createElement("div");
+    msgEl.className = "error-modal-message";
+    msgEl.textContent = message;
+
+    card.appendChild(iconWrap);
+    card.appendChild(titleEl);
+    card.appendChild(msgEl);
+
+    if (hint) {
+      var hintEl = document.createElement("div");
+      hintEl.className = "error-modal-hint";
+      hintEl.textContent = hint;
+      card.appendChild(hintEl);
+    }
+
+    var actions = document.createElement("div");
+    actions.className = "error-modal-actions";
+    var closeBtn = document.createElement("button");
+    closeBtn.className = "error-modal-btn primary";
+    closeBtn.textContent = "知道了";
+    closeBtn.addEventListener("click", function () { overlay.remove(); });
+    actions.appendChild(closeBtn);
+    card.appendChild(actions);
+
+    overlay.appendChild(card);
+    // Click overlay to dismiss
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
+  // =======================================================================
   // Global LLM Settings
   // =======================================================================
   function getLlmConfig() {
@@ -207,7 +259,7 @@
     }
     return _origFetch(url, options).then(function (resp) {
       if (resp.status === 401) {
-        showToast("登录已过期，请重新登录");
+        showErrorModal("登录已过期", "您的登录状态已失效，请重新登录后再操作。");
         saveAuthState(null);
       }
       return resp;
@@ -631,7 +683,7 @@
       .catch(function (err) {
         loadingIndicator.classList.add("hidden");
         uploadZone.classList.remove("uploading");
-        showToast("上传失败：" + err.message);
+        showErrorModal("上传失败", err.message || "请检查网络连接和后端是否正常启动");
         showUploadStatus("上传失败: " + err.message, true);
       });
   }
@@ -670,7 +722,7 @@
   });
   fileInput.addEventListener("change", function () {
     var f = fileInput.files[0]; if (!f) return;
-    var v = validateFile(f); if (!v.ok) { showToast(v.error); return; }
+    var v = validateFile(f); if (!v.ok) { showErrorModal("文件无效", v.error); return; }
     uploadFile(f);
   });
   uploadZone.addEventListener("dragover", function (e) { e.preventDefault(); uploadZone.classList.add("drag-over"); });
@@ -679,7 +731,7 @@
     e.preventDefault(); uploadZone.classList.remove("drag-over");
     if (!currentUser || !currentUser.token) { showToast("请先在左侧登录"); return; }
     var f = e.dataTransfer.files[0]; if (!f) return;
-    var v = validateFile(f); if (!v.ok) { showToast(v.error); return; }
+    var v = validateFile(f); if (!v.ok) { showErrorModal("文件无效", v.error); return; }
     uploadFile(f);
   });
   ["dragenter","dragover","dragleave","drop"].forEach(function (ev) {
@@ -1328,7 +1380,7 @@
 
       case "error":
         console.error("[SSE] Error:", data);
-        showToast(data.message || "分析出错");
+        showErrorModal("分析异常", data.message || "分析过程出现未知错误，请检查 LLM 配置或重试。");
         var errStatus = $("#card-status-" + analysisId);
         if (errStatus) errStatus.textContent = "出错: " + (data.message || "未知错误");
         var errProgress = $("#card-progress-" + analysisId);
@@ -1672,29 +1724,61 @@
     trainProgressArea.classList.remove("hidden"); trainResultArea.classList.add("hidden"); btnEnterSb.classList.add("hidden");
     trainLogs.innerHTML = ""; trainProgressFill.style.width = "0%"; trainProgressPct.textContent = "0%";
 
-    appendTrainLog("准备训练数据...");
-    trainProgressFill.style.width = "10%"; trainProgressPct.textContent = "10%";
+    appendTrainLog("正在检查数据质量...");
+    trainProgressFill.style.width = "5%"; trainProgressPct.textContent = "5%";
 
-    // Small delay so user sees the log entries, then fire request
-    setTimeout(function () {
+    // Step 1 — preview data quality before training
+    fetch(API_BASE + "/preview-train", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ filename: currentFilename, target_col: y, feature_cols: feats }),
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (b) { throw new Error(b.detail || "预览失败: " + r.status); });
+      return r.json();
+    }).then(function (preview) {
+      // Show preview summary
+      appendTrainLog("数据总量: " + preview.total_rows.toLocaleString() + " 行");
+      if (preview.bad_features && preview.bad_features.length > 0) {
+        appendTrainLog("警告: " + preview.bad_features.join(", ") + " 不是数值列，无法用于训练", true);
+        showTrainResultError("以下特征不是数值列，不支持用于回归分析：" + preview.bad_features.join("、") + "。请选择数值型特征（如 Quantity、UnitPrice）。");
+        trainProgressFill.style.width = "100%"; trainProgressPct.textContent = "100%";
+        return;
+      }
+      appendTrainLog("有效样本: " + preview.effective_rows.toLocaleString() + " 行 (排除 " + preview.y_dropped_pct + "% 缺失 Y)");
+      // Show per-feature quality
+      Object.keys(preview.features).forEach(function (f) {
+        var fi = preview.features[f];
+        if (fi.nan_pct > 0) {
+          appendTrainLog("  " + f + ": " + fi.nan_pct + "% 缺失 (将被中位数填补)", false);
+        }
+      });
+
+      // Step 2 — actual training
       appendTrainLog("正在拟合模型 + 计算诊断指标...");
       trainProgressFill.style.width = "30%"; trainProgressPct.textContent = "30%";
 
-      fetch(API_BASE + "/train", {
+      return fetch(API_BASE + "/train", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ filename: currentFilename, target_col: y, feature_cols: feats }),
-      }).then(function (r) {
-        if (!r.ok) return r.json().then(function (b) { throw new Error(b.detail || "服务器返回 " + r.status); });
-        return r.json();
-      }).then(function (d) {
-        trainProgressFill.style.width = "100%"; trainProgressPct.textContent = "100%";
-        if (d.error) { appendTrainLog("失败: " + d.error, true); showTrainResultError(d.error); }
-        else { appendTrainLog("训练完成", false); showTrainResult(d); }
-      }).catch(function (err) {
-        trainProgressFill.style.width = "100%"; trainProgressPct.textContent = "100%";
-        appendTrainLog(err.message || "未知错误", true); showTrainResultError(err.message || "未知错误");
       });
-    }, 200);
+    }).then(function (r) {
+      // r is undefined if we early-returned from preview (bad features)
+      if (!r) return;
+      if (!r.ok) return r.json().then(function (b) { throw new Error(b.detail || "服务器返回 " + r.status); });
+      return r.json();
+    }).then(function (d) {
+      if (!d) return;  // early return from preview
+      trainProgressFill.style.width = "100%"; trainProgressPct.textContent = "100%";
+      if (d.error) { appendTrainLog("失败: " + d.error, true); showTrainResultError(d.error); }
+      else { appendTrainLog("训练完成", false); showTrainResult(d); }
+    }).catch(function (err) {
+      trainProgressFill.style.width = "100%"; trainProgressPct.textContent = "100%";
+      var errMsg = err.message || "未知错误";
+      // Don't show raw system errors to users
+      if (errMsg.indexOf("arg must be a list") > -1 || errMsg.indexOf("1-d array") > -1) {
+        errMsg = "所选特征数据格式不支持，请确保所有特征均为数值型列。";
+      }
+      appendTrainLog(errMsg, true); showTrainResultError(errMsg);
+    });
   }
 
   function appendTrainLog(text, isErr) {
@@ -1706,7 +1790,23 @@
 
   function showTrainResultError(msg) {
     trainResultArea.classList.remove("hidden");
-    trainResultArea.innerHTML = '<div class="rounded-xl p-4 text-center" style="background:#FEF2F2; border:1px solid #FECACA;"><p class="text-sm" style="color:#991B1B;">' + escapeHtml(msg) + '</p></div>';
+    var friendlyMsg = msg;
+    if (msg.indexOf("无法转换为数值") > -1 || msg.indexOf("不支持用于回归") > -1) {
+      friendlyMsg = msg;
+    } else if (msg.indexOf("模型训练异常") > -1 || msg.indexOf("服务器返回") > -1) {
+      friendlyMsg = "训练请求失败，请检查所选特征是否均为数值型列。如问题持续，请尝试更换特征组合。";
+    }
+    trainResultArea.innerHTML =
+      '<div class="rounded-xl p-5 text-center" style="background:#FEF2F2; border:1px solid #FECACA;">' +
+        '<div class="flex items-center justify-center gap-2 mb-2">' +
+          '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM10 6v5M10 13.5v.5" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+          '<p class="font-semibold" style="color:#991B1B;font-size:0.95rem;">模型训练未能完成</p>' +
+        '</div>' +
+        '<p class="text-sm mb-3" style="color:#991B1B;">' + escapeHtml(friendlyMsg) + '</p>' +
+        '<p class="text-xs" style="color:#B91C1C;opacity:0.7;">建议：请确保目标变量和所有特征均为数值型列（如 Quantity、UnitPrice），避免选择文本或分类列（如 Country、Description）。</p>' +
+      '</div>';
+    // Also show error modal for better visibility
+    showErrorModal("模型训练未能完成", friendlyMsg, "建议：请确保目标变量和所有特征均为数值型列（如 Quantity、UnitPrice），避免选择文本或分类列（如 Country、Description）。");
   }
 
   function showTrainResult(d) {
@@ -1714,6 +1814,13 @@
     var r2 = (d.r2_score != null) ? d.r2_score : 0;
     var nSamples = (d.n_samples != null) ? d.n_samples : 0;
     var diag = d.diagnostics || {};
+
+    // Show high-cardinality warnings if any
+    if (d.warnings && d.warnings.length > 0) {
+      d.warnings.forEach(function (w) {
+        appendTrainLog("警告: " + w, true);
+      });
+    }
     var residualStd = diag.residual_std || 0;
     var fi = d.feature_importance || {};
 

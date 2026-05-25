@@ -1192,3 +1192,55 @@ body {
    ========================================================================= */
 .train-diag-section { margin-top: 0.75rem; }
 .train-diag-title { font-size: 0.75rem; font-weight: 600; color: #64748B; margin-bottom: 0.25rem; }
+
+/* =========================================================================
+   29.  Error modal
+   ========================================================================= */
+.error-modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15,23,42,0.45);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+.error-modal-card {
+  background: #FFFFFF; border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.18);
+  max-width: 440px; width: 90%;
+  padding: 1.5rem 1.75rem;
+  animation: modalSlideUp 0.25s ease-out;
+}
+.error-modal-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.error-modal-icon.error   { background: #FEF2F2; color: #DC2626; }
+.error-modal-icon.warning { background: #FFFBEB; color: #D97706; }
+.error-modal-title   { font-size: 1.05rem; font-weight: 600; color: #1E293B; margin-bottom: 0.35rem; }
+.error-modal-message { font-size: 0.875rem; color: #475569; line-height: 1.6; margin-bottom: 0.6rem; }
+.error-modal-hint    { font-size: 0.8rem; color: #94A3B8; line-height: 1.5; margin-bottom: 1rem; }
+.error-modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.error-modal-btn {
+  padding: 0.5rem 1.2rem; border-radius: 8px; font-size: 0.85rem;
+  font-weight: 500; cursor: pointer; transition: all 0.15s;
+  border: none; outline: none;
+}
+.error-modal-btn.primary {
+  background: #2563EB; color: #FFFFFF;
+}
+.error-modal-btn.primary:hover { background: #1D4ED8; }
+.error-modal-btn.ghost {
+  background: transparent; color: #64748B;
+}
+.error-modal-btn.ghost:hover { background: #F1F5F9; color: #334155; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
