@@ -145,6 +145,7 @@
       case "datetime": l = "日期"; cls = "bg-cyan-50 text-cyan-600"; break;
       case "text": l = "文本"; cls = "bg-amber-50 text-amber-600"; break;
       case "boolean": l = "布尔"; cls = "bg-emerald-50 text-emerald-600"; break;
+      case "identifier": l = "标识符"; cls = "bg-red-50 text-red-600"; break;
     }
     return '<span class="inline-block text-[10px] px-1.5 py-0.5 rounded-full ' + cls + '">' + l + '</span>';
   }
@@ -922,7 +923,7 @@
   }
 
   function renderFieldTypeChart(profiles) {
-    var counts = { numeric: 0, categorical: 0, datetime: 0, text: 0, boolean: 0 };
+    var counts = { numeric: 0, categorical: 0, datetime: 0, text: 0, boolean: 0, identifier: 0 };
     profiles.forEach(function (p) { if (counts[p.dtype] !== undefined) counts[p.dtype]++; });
     var dom = $("#fieldTypeChart"); dom.innerHTML = "";
     if (typeof echarts === "undefined") return;
@@ -937,6 +938,7 @@
           { name: "日期", value: counts.datetime, itemStyle: { color: "#06B6D4" } },
           { name: "文本", value: counts.text, itemStyle: { color: "#F59E0B" } },
           { name: "布尔", value: counts.boolean, itemStyle: { color: "#10B981" } },
+          { name: "标识符", value: counts.identifier, itemStyle: { color: "#EF4444" } },
         ].filter(function (d) { return d.value > 0; }),
         label: { fontSize: 10 },
       }],
@@ -1113,6 +1115,34 @@
           return '<tr><td>' + escapeHtml(t.column) + '</td><td>' + t.current + '</td><td>' + t.suggested + '</td></tr>';
         }).join("") + '</tbody></table></div>' : ''),
       typeSugs.length > 0 ? "warning" : "ok");
+
+    // --- Low variance panel ---
+    var lowVar = issues.low_variance || [];
+    panelsHtml += buildCleaningPanel("低方差列（近乎常量）", lowVar.length,
+      '<div class="text-xs mb-2" style="color:#64748B;">' + (lowVar.length > 0 ? '以下列唯一值占比 < 0.1%，几乎无信息量，建议删除。' : '未发现。') + '</div>' +
+      (lowVar.length > 0 ? '<div class="overflow-x-auto"><table class="analysis-stats-table"><thead><tr><th>列名</th><th>唯一值占比</th></tr></thead><tbody>' +
+        lowVar.map(function (lv) { return '<tr><td>' + escapeHtml(lv.column) + '</td><td>' + lv.pct + '%</td></tr>'; }).join("") +
+        '</tbody></table></div>' : ''),
+      lowVar.length > 0 ? "warning" : "ok");
+
+    // --- Duplicate columns panel ---
+    var dupCols = issues.duplicate_columns || [];
+    panelsHtml += buildCleaningPanel("重复列（高度相关）", dupCols.length,
+      '<div class="text-xs mb-2" style="color:#64748B;">' + (dupCols.length > 0 ? '以下列对相关系数 > 0.999，可能为冗余列，建议删除其中之一。' : '未发现高度相关的重复列。') + '</div>' +
+      (dupCols.length > 0 ? '<div class="overflow-x-auto"><table class="analysis-stats-table"><thead><tr><th>列A</th><th>列B</th><th>相关系数</th></tr></thead><tbody>' +
+        dupCols.map(function (d) { return '<tr><td>' + escapeHtml(d.column_a) + '</td><td>' + escapeHtml(d.column_b) + '</td><td>' + d.correlation + '</td></tr>'; }).join("") +
+        '</tbody></table></div>' : ''),
+      dupCols.length > 0 ? "warning" : "ok");
+
+    // --- Missing patterns panel ---
+    var missPat = issues.missing_patterns || [];
+    panelsHtml += buildCleaningPanel("缺失值关联模式", missPat.length,
+      '<div class="text-xs mb-2" style="color:#64748B;">' + (missPat.length > 0 ? '以下列对的缺失存在强关联（即 A 缺失时 B 也大概率缺失），可能反映隐含的业务逻辑。' : '未检测到缺失值关联模式。') + '</div>' +
+      (missPat.length > 0 ? '<div class="overflow-x-auto"><table class="analysis-stats-table"><thead><tr><th>列A</th><th>列B</th><th>联合缺失数</th><th>A缺失时B也缺失</th><th>B缺失时A也缺失</th></tr></thead><tbody>' +
+        missPat.map(function (m) {
+          return '<tr><td>' + escapeHtml(m.column_a) + '</td><td>' + escapeHtml(m.column_b) + '</td><td>' + m.joint_missing + '</td><td>' + (m.a_when_b_missing_rate * 100).toFixed(1) + '%</td><td>' + (m.b_when_a_missing_rate * 100).toFixed(1) + '%</td></tr>';
+        }).join("") + '</tbody></table></div>' : ''),
+      missPat.length > 0 ? "warning" : "ok");
 
     cleaningPanels.innerHTML = panelsHtml;
     bindCleaningPanelToggles();

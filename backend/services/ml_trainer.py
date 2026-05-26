@@ -531,6 +531,10 @@ def _compare_models(X: np.ndarray, y: np.ndarray,
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
 
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
     alpha = 1.0  # default regularisation
 
     models: dict[str, Any] = {

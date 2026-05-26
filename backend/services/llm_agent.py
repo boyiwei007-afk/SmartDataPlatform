@@ -387,6 +387,7 @@ def _format_columns_desc(schema: dict[str, Any]) -> str:
             "datetime": "日期",
             "text": "文本",
             "boolean": "布尔",
+            "identifier": "标识符",
         }.get(dtype, dtype)
         parts.append(f"({type_hint}")
 

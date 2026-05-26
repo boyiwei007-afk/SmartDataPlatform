@@ -8,6 +8,4 @@ auth.db
 *.pdf
 ~$*
 node_modules/
-技术讲解.md
-讨论过程.md
-维护建议.md
+backend/uploads/

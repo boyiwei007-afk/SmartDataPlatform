@@ -15,6 +15,7 @@ Design principles:
 from __future__ import annotations
 
 import logging
+import re
 import warnings
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,7 @@ def process_dataframe(file_path: str) -> dict[str, Any]:
         series = df[col]
         missing_count = int(series.isna().sum())
         missing_rate = round(missing_count / total_rows, 4) if total_rows else 0.0
-        dtype_name = _infer_dtype(series)
+        dtype_name = _infer_dtype(series, col_str)
 
         columns_meta.append({
             "name": col_str,
@@ -179,14 +180,13 @@ def _sanitise_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _infer_dtype(series: pd.Series) -> str:
+def _infer_dtype(series: pd.Series, col_name: str = "") -> str:
     """Heuristic column-type classifier.
 
     Returns one of:
         ``"numeric"``, ``"categorical"``, ``"datetime"``, ``"text"``,
-        ``"boolean"``, ``"unknown"``.
+        ``"boolean"``, ``"identifier"``, ``"unknown"``.
     """
-    # Drop NaN for cleaner inference
     s = series.dropna()
     if len(s) == 0:
         return "unknown"
@@ -197,28 +197,45 @@ def _infer_dtype(series: pd.Series) -> str:
     if s.nunique() <= 2 and set(s.unique()).issubset({0, 1, True, False, "True", "False", "true", "false", 0.0, 1.0}):
         return "boolean"
 
-    # Numeric
+    # Identifier — name-pattern check (before numeric so e.g. user_id isn't treated as a feature)
+    if col_name:
+        name_lower = str(col_name).lower().strip()
+        id_patterns = (
+            r'(^|_)id$', r'(^|_)no$', r'(^|_)编号$', r'(^|_)序号$',
+            r'(^|_)code$', r'(^|_)编码$', r'(^|_)key$',
+        )
+        if any(re.search(pat, name_lower) for pat in id_patterns):
+            return "identifier"
+
+    # Numeric — but check for high-cardinality integer ID first
     if pd.api.types.is_numeric_dtype(s):
+        nunique = s.nunique()
+        total = len(s)
+        if total > 0 and (nunique / total) > 0.9 and nunique > 50:
+            return "identifier"
         return "numeric"
 
-    # Datetime
+    # Datetime — sampling-based so a few bad values don't defeat detection
     if pd.api.types.is_datetime64_any_dtype(s):
         return "datetime"
-    # Try to coerce to datetime for object columns (suppress dateutil noise)
     if s.dtype == object:
+        sample = s.head(200)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
-                pd.to_datetime(s, errors="raise")
-            return "datetime"
-        except (ValueError, TypeError):
+                parsed = pd.to_datetime(sample, errors="coerce")
+            if parsed.notna().mean() >= 0.8 and len(parsed) >= 3:
+                return "datetime"
+        except Exception:
             pass
 
     # String / object
     if s.dtype == object:
         nunique = s.nunique()
         total = len(s)
-        # If cardinality is low relative to sample → categorical
+        avg_len = s.dropna().astype(str).str.len().mean()
+        if nunique > 50 and (nunique / total) >= 0.2 and avg_len > 80:
+            return "text"
         if nunique <= 50 or (nunique / total) < 0.2:
             return "categorical"
         return "text"
@@ -241,7 +258,7 @@ def _column_stats(series: pd.Series, dtype_name: str) -> dict[str, Any]:
             stats["max"] = _safe_json_value(s.max())
             stats["mean"] = round(float(s.mean()), 4)
             stats["std"] = round(float(s.std()), 4)
-    elif dtype_name in ("categorical", "boolean"):
+    elif dtype_name in ("categorical", "boolean", "identifier"):
         counts = series.dropna().value_counts().head(5)
         stats["top_values"] = {
             str(k): int(v) for k, v in counts.items()
@@ -306,7 +323,7 @@ def get_advanced_analysis(file_path: str) -> dict[str, Any]:
 
     for col in df.columns:
         try:
-            dt = _infer_dtype(df[col])
+            dt = _infer_dtype(df[col], str(col))
         except Exception:
             continue
         if dt == "numeric":
