@@ -467,7 +467,7 @@ def _call_llm(
             {"role": "user", "content": user_query},
         ],
         "temperature": 0.3,
-        "max_tokens": 1024,
+        "max_tokens": 2048,
     }
 
     try:
@@ -536,7 +536,7 @@ async def _call_llm_stream(
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0.3,
-        "max_tokens": 2048,
+        "max_tokens": 4096,
         "stream": True,
     }
 
@@ -615,6 +615,13 @@ def _extract_json(text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    # Re-raise the original parse error with context
-    snippet = text[:200] + ("..." if len(text) > 200 else "")
-    raise ValueError(f"无法解析 LLM 返回的 JSON。前 200 字符: {snippet}")
+    # Re-raise with context: head (for format check) + tail (for truncation check)
+    if len(text) > 400:
+        snippet = (
+            f"前 200 字符: {text[:200]}\n"
+            f"后 200 字符: ...{text[-200:]}\n"
+            f"总长度: {len(text)} 字符"
+        )
+    else:
+        snippet = f"完整文本 ({len(text)} 字符): {text}"
+    raise ValueError(f"无法解析 LLM 返回的 JSON。\n{snippet}")
