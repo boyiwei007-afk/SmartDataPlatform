@@ -190,6 +190,12 @@
     var nameEl = $("#loginInfoName"), roleEl = $("#loginInfoRole");
     var mgmtBtn = $("#btnUserMgmt");
     var adminTab = $("#tabBtnAdmin");
+
+    // Kick non-admin / logged-out users out of admin tab
+    if (activeTab === "admin" && (!currentUser || currentUser.role !== "admin")) {
+      switchTab("import");
+    }
+
     if (currentUser && currentUser.token) {
       if (form) form.classList.add("hidden");
       if (info) info.classList.remove("hidden");
@@ -285,7 +291,7 @@
       }).catch(function () { showLoginStatus("网络错误", true); });
   });
 
-  // Register
+  // Register → auto-prompt login
   $("#btnRegister").addEventListener("click", function () {
     var u = $("#loginUsername").value.trim();
     var p = $("#loginPassword").value.trim();
@@ -297,9 +303,71 @@
     }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
       .then(function (res) {
         if (!res.ok) { showLoginStatus(res.data.detail || "注册失败", true); return; }
-        showLoginStatus("注册成功，请登录", false);
+        // Show confirmation modal
+        showRegisterSuccessModal(u, p);
       }).catch(function () { showLoginStatus("网络错误", true); });
   });
+
+  function showRegisterSuccessModal(username, password) {
+    var overlay = document.createElement("div");
+    overlay.className = "error-modal-overlay";
+
+    var card = document.createElement("div");
+    card.className = "error-modal-card";
+
+    var iconWrap = document.createElement("div");
+    iconWrap.className = "error-modal-icon";
+    iconWrap.style.background = "#ECFDF5"; iconWrap.style.color = "#059669";
+    iconWrap.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/></svg>';
+
+    var titleEl = document.createElement("div");
+    titleEl.className = "error-modal-title";
+    titleEl.textContent = "注册成功";
+
+    var msgEl = document.createElement("div");
+    msgEl.className = "error-modal-message";
+    msgEl.textContent = "账号「" + username + "」已创建，是否立即登录？";
+
+    card.appendChild(iconWrap);
+    card.appendChild(titleEl);
+    card.appendChild(msgEl);
+
+    var actions = document.createElement("div");
+    actions.className = "error-modal-actions";
+
+    var cancelBtn = document.createElement("button");
+    cancelBtn.className = "error-modal-btn ghost";
+    cancelBtn.textContent = "稍后再说";
+    cancelBtn.addEventListener("click", function () { overlay.remove(); });
+
+    var loginBtn = document.createElement("button");
+    loginBtn.className = "error-modal-btn primary";
+    loginBtn.textContent = "立即登录";
+    loginBtn.addEventListener("click", function () {
+      overlay.remove();
+      // Auto-login
+      _origFetch(API_BASE + "/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username, password: password }),
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (!res.ok) { showToast("自动登录失败，请手动登录"); return; }
+          saveAuthState({ username: res.data.username, role: res.data.role, token: res.data.token });
+          showToast("登录成功");
+          $("#loginUsername").value = ""; $("#loginPassword").value = "";
+          showPrivacyNotice();
+          showHistoryPicker();
+        }).catch(function () { showToast("登录失败，请检查网络"); });
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(loginBtn);
+    card.appendChild(actions);
+
+    overlay.appendChild(card);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
 
   // Logout
   $("#btnLogout").addEventListener("click", function () { saveAuthState(null); });
@@ -569,6 +637,10 @@
   // Tab Manager
   // =======================================================================
   function switchTab(tabName) {
+    if (tabName === "admin" && (!currentUser || currentUser.role !== "admin")) {
+      showToast("仅管理员可访问用户管理页面");
+      return;
+    }
     if (activeTab === tabName) return;
     var oldIdx = TAB_ORDER.indexOf(activeTab);
     var newIdx = TAB_ORDER.indexOf(tabName);

@@ -975,7 +975,7 @@ body {
    23.  Notebook layout (Tab 3)
    ========================================================================= */
 .notebook-sidebar {
-  width: 14rem;
+  width: 16rem;
   flex-shrink: 0;
   background: #FFFFFF;
   border-right: 1px solid #E2E8F0;

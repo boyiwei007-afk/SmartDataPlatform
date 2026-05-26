@@ -196,11 +196,14 @@ async def get_users(current_user: dict = Depends(get_current_user)):
 @app.delete("/users/{username}", tags=["auth"])
 async def remove_user(username: str,
                       current_user: dict = Depends(get_current_user)):
-    """Admin: delete a user account."""
+    """Delete a user account. Admin can delete anyone; users can delete themselves."""
     if not current_user:
         raise HTTPException(status_code=401, detail="请先登录")
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    # Admin can delete any user; regular users can only self-delete
+    is_admin = current_user.get("role") == "admin"
+    is_self = current_user.get("username") == username
+    if not is_admin and not is_self:
+        raise HTTPException(status_code=403, detail="仅可注销自己的账号")
     result = auth_delete_user(username)
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result["error"])
